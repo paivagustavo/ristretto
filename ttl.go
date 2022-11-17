@@ -137,7 +137,7 @@ func (m *expirationMap[V]) cleanup(store store[V], policy policy[V], onEvict ite
 		_, value := store.Del(key, conflict)
 
 		if onEvict != nil {
-			onEvict(&Item[V]{Key: key,
+			onEvict(Item[V]{Key: key,
 				Conflict: conflict,
 				Value:    value,
 				Cost:     cost,

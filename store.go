@@ -43,12 +43,12 @@ type store[V any] interface {
 	// Set adds the key-value pair to the Map or updates the value if it's
 	// already present. The key-value pair is passed as a pointer to an
 	// item object.
-	Set(*Item[V])
+	Set(Item[V])
 	// Del deletes the key-value pair from the Map.
 	Del(uint64, uint64) (uint64, V)
 	// Update attempts to update the key with a new value and returns true if
 	// successful.
-	Update(*Item[V]) (V, bool)
+	Update(Item[V]) (V, bool)
 	// Cleanup removes items that have an expired TTL.
 	Cleanup(policy policy[V], onEvict itemCallback[V])
 	// Clear clears all contents of the store.
@@ -86,12 +86,8 @@ func (sm *shardedMap[V]) Expiration(key uint64) time.Time {
 	return sm.shards[key%numShards].Expiration(key)
 }
 
-func (sm *shardedMap[V]) Set(i *Item[V]) {
-	if i == nil {
-		// If item is nil make this Set a no-op.
-		return
-	}
-
+func (sm *shardedMap[V]) Set(i Item[V]) {
+	// TODO: i.flag should have a invalid zero value flag for invalid items.
 	sm.shards[i.Key%numShards].Set(i)
 }
 
@@ -99,7 +95,7 @@ func (sm *shardedMap[V]) Del(key, conflict uint64) (uint64, V) {
 	return sm.shards[key%numShards].Del(key, conflict)
 }
 
-func (sm *shardedMap[V]) Update(newItem *Item[V]) (V, bool) {
+func (sm *shardedMap[V]) Update(newItem Item[V]) (V, bool) {
 	return sm.shards[newItem.Key%numShards].Update(newItem)
 }
 
@@ -153,11 +149,8 @@ func (m *lockedMap[V]) Expiration(key uint64) time.Time {
 	return m.data[key].expiration
 }
 
-func (m *lockedMap[V]) Set(i *Item[V]) {
-	if i == nil {
-		// If the item is nil make this Set a no-op.
-		return
-	}
+func (m *lockedMap[V]) Set(i Item[V]) {
+	// TODO: i.flag should have a invalid zero value flag for invalid items.
 
 	m.Lock()
 	defer m.Unlock()
@@ -207,7 +200,7 @@ func (m *lockedMap[V]) Del(key, conflict uint64) (uint64, V) {
 	return item.conflict, item.value
 }
 
-func (m *lockedMap[V]) Update(newItem *Item[V]) (V, bool) {
+func (m *lockedMap[V]) Update(newItem Item[V]) (V, bool) {
 	m.Lock()
 	item, ok := m.data[newItem.Key]
 	if !ok {
@@ -235,13 +228,13 @@ func (m *lockedMap[V]) Update(newItem *Item[V]) (V, bool) {
 
 func (m *lockedMap[V]) Clear(onEvict itemCallback[V]) {
 	m.Lock()
-	i := &Item[V]{}
 	if onEvict != nil {
 		for _, si := range m.data {
-			i.Key = si.key
-			i.Conflict = si.conflict
-			i.Value = si.value
-			onEvict(i)
+			onEvict(Item[V]{
+				Key:      si.key,
+				Conflict: si.conflict,
+				Value:    si.value,
+			})
 		}
 	}
 	m.data = make(map[uint64]storeItem[V])

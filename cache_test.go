@@ -225,7 +225,7 @@ func TestCacheProcessItems(t *testing.T) {
 		Cost: func(value int) int64 {
 			return int64(value)
 		},
-		OnEvict: func(item *Item[int]) {
+		OnEvict: func(item Item[int]) {
 			m.Lock()
 			defer m.Unlock()
 			evicted[item.Key] = struct{}{}
@@ -237,7 +237,7 @@ func TestCacheProcessItems(t *testing.T) {
 	var conflict uint64
 
 	key, conflict = z.KeyToHash(1)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemNew,
 		Key:      key,
 		Conflict: conflict,
@@ -249,7 +249,7 @@ func TestCacheProcessItems(t *testing.T) {
 	require.Equal(t, int64(1), c.policy.Cost(1))
 
 	key, conflict = z.KeyToHash(1)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemUpdate,
 		Key:      key,
 		Conflict: conflict,
@@ -260,7 +260,7 @@ func TestCacheProcessItems(t *testing.T) {
 	require.Equal(t, int64(2), c.policy.Cost(1))
 
 	key, conflict = z.KeyToHash(1)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemDelete,
 		Key:      key,
 		Conflict: conflict,
@@ -273,7 +273,7 @@ func TestCacheProcessItems(t *testing.T) {
 	require.False(t, c.policy.Has(1))
 
 	key, conflict = z.KeyToHash(2)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemNew,
 		Key:      key,
 		Conflict: conflict,
@@ -281,7 +281,7 @@ func TestCacheProcessItems(t *testing.T) {
 		Cost:     3,
 	}
 	key, conflict = z.KeyToHash(3)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemNew,
 		Key:      key,
 		Conflict: conflict,
@@ -289,7 +289,7 @@ func TestCacheProcessItems(t *testing.T) {
 		Cost:     3,
 	}
 	key, conflict = z.KeyToHash(4)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemNew,
 		Key:      key,
 		Conflict: conflict,
@@ -297,7 +297,7 @@ func TestCacheProcessItems(t *testing.T) {
 		Cost:     3,
 	}
 	key, conflict = z.KeyToHash(5)
-	c.setBuf <- &Item[int]{
+	c.setBuf <- Item[int]{
 		flag:     itemNew,
 		Key:      key,
 		Conflict: conflict,
@@ -313,7 +313,7 @@ func TestCacheProcessItems(t *testing.T) {
 		require.NotNil(t, recover())
 	}()
 	c.Close()
-	c.setBuf <- &Item[int]{flag: itemNew}
+	c.setBuf <- Item[int]{flag: itemNew}
 }
 
 func TestCacheGet(t *testing.T) {
@@ -332,7 +332,7 @@ func TestCacheGet(t *testing.T) {
 		Conflict: conflict,
 		Value:    1,
 	}
-	c.store.Set(&i)
+	c.store.Set(i)
 	val, ok := c.Get(1)
 	require.True(t, ok)
 	require.NotNil(t, val)
@@ -387,7 +387,7 @@ func TestCacheSet(t *testing.T) {
 	c.stop <- struct{}{}
 	for i := 0; i < setBufSize; i++ {
 		key, conflict := z.KeyToHash(1)
-		c.setBuf <- &Item[int]{
+		c.setBuf <- Item[int]{
 			flag:     itemUpdate,
 			Key:      key,
 			Conflict: conflict,
@@ -528,7 +528,7 @@ func TestCacheSetWithTTL(t *testing.T) {
 		IgnoreInternalCost: true,
 		BufferItems:        64,
 		Metrics:            true,
-		OnEvict: func(item *Item[int]) {
+		OnEvict: func(item Item[int]) {
 			m.Lock()
 			defer m.Unlock()
 			evicted[item.Key] = struct{}{}
@@ -901,7 +901,7 @@ func TestDropUpdates(t *testing.T) {
 			MaxCost:     10,
 			BufferItems: 64,
 			Metrics:     true,
-			OnEvict: func(item *Item[string]) {
+			OnEvict: func(item Item[string]) {
 				handler(nil, item.Value)
 			},
 		})

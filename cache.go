@@ -36,7 +36,7 @@ var (
 	setBufSize = 32 * 1024
 )
 
-type itemCallback[V any] func(*Item[V])
+type itemCallback[V any] func(Item[V])
 
 const itemSize = int64(unsafe.Sizeof(storeItem[struct{}]{}))
 
@@ -53,7 +53,7 @@ type Cache[K any, V any] struct {
 	getBuf *ringBuffer
 	// setBuf is a buffer allowing us to batch/drop Sets during times of high
 	// contention.
-	setBuf chan *Item[V]
+	setBuf chan Item[V]
 	// onEvict is called for item evictions.
 	onEvict itemCallback[V]
 	// onReject is called when an item is rejected via admission policy.
@@ -115,9 +115,9 @@ type Config[K any, V any] struct {
 	Metrics bool
 	// OnEvict is called for every eviction and passes the hashed key, value,
 	// and cost to the function.
-	OnEvict func(item *Item[V])
+	OnEvict func(item Item[V])
 	// OnReject is called for every rejection done via the policy.
-	OnReject func(item *Item[V])
+	OnReject func(item Item[V])
 	// OnExit is called whenever a value is removed from cache. This can be
 	// used to do manual memory deallocation. Would also be called on eviction
 	// and rejection of the value.
@@ -171,7 +171,7 @@ func NewCache[K any, V any](config *Config[K, V]) (*Cache[K, V], error) {
 		store:              newStore[V](),
 		policy:             policy,
 		getBuf:             newRingBuffer(policy, config.BufferItems),
-		setBuf:             make(chan *Item[V], setBufSize),
+		setBuf:             make(chan Item[V], setBufSize),
 		keyToHash:          config.KeyToHash,
 		stop:               make(chan struct{}),
 		cost:               config.Cost,
@@ -183,13 +183,13 @@ func NewCache[K any, V any](config *Config[K, V]) (*Cache[K, V], error) {
 			config.OnExit(v)
 		}
 	}
-	cache.onEvict = func(item *Item[V]) {
+	cache.onEvict = func(item Item[V]) {
 		if config.OnEvict != nil {
 			config.OnEvict(item)
 		}
 		cache.onExit(item.Value)
 	}
-	cache.onReject = func(item *Item[V]) {
+	cache.onReject = func(item Item[V]) {
 		if config.OnReject != nil {
 			config.OnReject(item)
 		}
@@ -214,7 +214,7 @@ func (c *Cache[K, V]) Wait() {
 	}
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	c.setBuf <- &Item[V]{wg: wg}
+	c.setBuf <- Item[V]{wg: wg}
 	wg.Wait()
 }
 
@@ -272,7 +272,7 @@ func (c *Cache[K, V]) SetWithTTL(key K, value V, cost int64, ttl time.Duration) 
 	}
 
 	keyHash, conflictHash := c.keyToHash(key)
-	i := &Item[V]{
+	i := Item[V]{
 		flag:       itemNew,
 		Key:        keyHash,
 		Conflict:   conflictHash,
@@ -315,7 +315,7 @@ func (c *Cache[K, V]) Del(key K) {
 	// So we must push the same item to `setBuf` with the deletion flag.
 	// This ensures that if a set is followed by a delete, it will be
 	// applied in the correct order.
-	c.setBuf <- &Item[V]{
+	c.setBuf <- Item[V]{
 		flag:     itemDelete,
 		Key:      keyHash,
 		Conflict: conflictHash,
@@ -439,7 +439,7 @@ func (c *Cache[K, V]) processItems() {
 			}
 		}
 	}
-	onEvict := func(i *Item[V]) {
+	onEvict := func(i Item[V]) {
 		if ts, has := startTs[i.Key]; has {
 			c.Metrics.trackEviction(int64(time.Since(ts) / time.Second))
 			delete(startTs, i.Key)
