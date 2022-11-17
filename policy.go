@@ -40,7 +40,7 @@ type policy[V any] interface {
 	// Add attempts to Add the key-cost pair to the Policy. It returns a slice
 	// of evicted keys and a bool denoting whether or not the key-cost pair
 	// was added. If it returns true, the key should be stored in cache.
-	Add(uint64, int64) ([]Item[V], bool)
+	Add(uint64, int64) ([]policyPair, bool)
 	// Has returns true if the key exists in the Policy.
 	Has(uint64) bool
 	// Del deletes the key from the Policy.
@@ -133,7 +133,7 @@ func (p *defaultPolicy[V]) Push(keys []uint64) bool {
 // Add decides whether the item with the given key and cost should be accepted by
 // the policy. It returns the list of victims that have been evicted and a boolean
 // indicating whether the incoming item should be accepted.
-func (p *defaultPolicy[V]) Add(key uint64, cost int64) ([]Item[V], bool) {
+func (p *defaultPolicy[V]) Add(key uint64, cost int64) ([]policyPair, bool) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -165,9 +165,9 @@ func (p *defaultPolicy[V]) Add(key uint64, cost int64) ([]Item[V], bool) {
 	// TODO: perhaps we should use a min heap here. Right now our time
 	// complexity is N for finding the min. Min heap should bring it down to
 	// O(lg N).
-	sample := make([]*policyPair, 0, lfuSample)
+	sample := make([]policyPair, 0, lfuSample)
 	// As items are evicted they will be appended to victims.
-	victims := make([]Item[V], 0)
+	victims := make([]policyPair, 0)
 
 	// Delete victims until there's enough space or a minKey is found that has
 	// more hits than incoming item.
@@ -197,9 +197,9 @@ func (p *defaultPolicy[V]) Add(key uint64, cost int64) ([]Item[V], bool) {
 		sample[minId] = sample[len(sample)-1]
 		sample = sample[:len(sample)-1]
 		// Store victim in evicted victims slice.
-		victims = append(victims, Item[V]{
-			Key:  minKey,
-			Cost: minCost,
+		victims = append(victims, policyPair{
+			key:  minKey,
+			cost: minCost,
 		})
 	}
 
@@ -310,12 +310,12 @@ func (p *sampledLFU) roomLeft(cost int64) int64 {
 	return p.getMaxCost() - (p.used + cost)
 }
 
-func (p *sampledLFU) fillSample(in []*policyPair) []*policyPair {
+func (p *sampledLFU) fillSample(in []policyPair) []policyPair {
 	if len(in) >= lfuSample {
 		return in
 	}
 	for key, cost := range p.keyCosts {
-		in = append(in, &policyPair{key, cost})
+		in = append(in, policyPair{key, cost})
 		if len(in) >= lfuSample {
 			return in
 		}

@@ -203,7 +203,7 @@ func TestSampledLFUSample(t *testing.T) {
 	e := newSampledLFU(16)
 	e.add(4, 4)
 	e.add(5, 5)
-	sample := e.fillSample([]*policyPair{
+	sample := e.fillSample([]policyPair{
 		{1, 1},
 		{2, 2},
 		{3, 3},

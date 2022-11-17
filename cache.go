@@ -476,8 +476,12 @@ func (c *Cache[K, V]) processItems() {
 					c.onReject(i)
 				}
 				for _, victim := range victims {
-					victim.Conflict, victim.Value = c.store.Del(victim.Key, 0)
-					onEvict(victim)
+					evicted := Item[V]{
+						Key:  victim.key,
+						Cost: victim.cost,
+					}
+					evicted.Conflict, evicted.Value = c.store.Del(victim.key, 0)
+					onEvict(evicted)
 				}
 
 			case itemUpdate:
