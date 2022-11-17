@@ -1,6 +1,7 @@
 package ristretto
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -9,58 +10,58 @@ import (
 )
 
 func TestStoreSetGet(t *testing.T) {
-	s := newStore()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
-	i := Item{
+	i := &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    2,
 	}
-	s.Set(&i)
+	s.Set(i)
 	val, ok := s.Get(key, conflict)
 	require.True(t, ok)
-	require.Equal(t, 2, val.(int))
+	require.Equal(t, 2, val)
 
 	i.Value = 3
-	s.Set(&i)
+	s.Set(i)
 	val, ok = s.Get(key, conflict)
 	require.True(t, ok)
-	require.Equal(t, 3, val.(int))
+	require.Equal(t, 3, val)
 
 	key, conflict = z.KeyToHash(2)
-	i = Item{
+	i = &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    2,
 	}
-	s.Set(&i)
+	s.Set(i)
 	val, ok = s.Get(key, conflict)
 	require.True(t, ok)
-	require.Equal(t, 2, val.(int))
+	require.Equal(t, 2, val)
 }
 
 func TestStoreDel(t *testing.T) {
-	s := newStore()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
-	i := Item{
+	i := &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    1,
 	}
-	s.Set(&i)
+	s.Set(i)
 	s.Del(key, conflict)
 	val, ok := s.Get(key, conflict)
 	require.False(t, ok)
-	require.Nil(t, val)
+	require.Equal(t, val, 0)
 
 	s.Del(2, 0)
 }
 
 func TestStoreClear(t *testing.T) {
-	s := newStore()
+	s := newStore[uint64]()
 	for i := uint64(0); i < 1000; i++ {
 		key, conflict := z.KeyToHash(i)
-		it := Item{
+		it := Item[uint64]{
 			Key:      key,
 			Conflict: conflict,
 			Value:    i,
@@ -72,21 +73,21 @@ func TestStoreClear(t *testing.T) {
 		key, conflict := z.KeyToHash(i)
 		val, ok := s.Get(key, conflict)
 		require.False(t, ok)
-		require.Nil(t, val)
+		require.Equal(t, uint64(0), val)
 	}
 }
 
 func TestStoreUpdate(t *testing.T) {
-	s := newStore()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
-	i := Item{
+	i := &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    1,
 	}
-	s.Set(&i)
+	s.Set(i)
 	i.Value = 2
-	_, ok := s.Update(&i)
+	_, ok := s.Update(i)
 	require.True(t, ok)
 
 	val, ok := s.Get(key, conflict)
@@ -95,33 +96,33 @@ func TestStoreUpdate(t *testing.T) {
 
 	val, ok = s.Get(key, conflict)
 	require.True(t, ok)
-	require.Equal(t, 2, val.(int))
+	require.Equal(t, 2, val)
 
 	i.Value = 3
-	_, ok = s.Update(&i)
+	_, ok = s.Update(i)
 	require.True(t, ok)
 
 	val, ok = s.Get(key, conflict)
 	require.True(t, ok)
-	require.Equal(t, 3, val.(int))
+	require.Equal(t, 3, val)
 
 	key, conflict = z.KeyToHash(2)
-	i = Item{
+	i = &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    2,
 	}
-	_, ok = s.Update(&i)
+	_, ok = s.Update(i)
 	require.False(t, ok)
 	val, ok = s.Get(key, conflict)
 	require.False(t, ok)
-	require.Nil(t, val)
+	require.Equal(t, val, 0)
 }
 
 func TestStoreCollision(t *testing.T) {
-	s := newShardedMap()
+	s := newShardedMap[int]()
 	s.shards[1].Lock()
-	s.shards[1].data[1] = storeItem{
+	s.shards[1].data[1] = storeItem[int]{
 		key:      1,
 		conflict: 0,
 		value:    1,
@@ -129,23 +130,23 @@ func TestStoreCollision(t *testing.T) {
 	s.shards[1].Unlock()
 	val, ok := s.Get(1, 1)
 	require.False(t, ok)
-	require.Nil(t, val)
+	require.Equal(t, val, 0)
 
-	i := Item{
+	i := &Item[int]{
 		Key:      1,
 		Conflict: 1,
 		Value:    2,
 	}
-	s.Set(&i)
+	s.Set(i)
 	val, ok = s.Get(1, 0)
 	require.True(t, ok)
-	require.NotEqual(t, 2, val.(int))
+	require.NotEqual(t, 2, val)
 
-	_, ok = s.Update(&i)
+	_, ok = s.Update(i)
 	require.False(t, ok)
 	val, ok = s.Get(1, 0)
 	require.True(t, ok)
-	require.NotEqual(t, 2, val.(int))
+	require.NotEqual(t, 2, val)
 
 	s.Del(1, 1)
 	val, ok = s.Get(1, 0)
@@ -154,19 +155,19 @@ func TestStoreCollision(t *testing.T) {
 }
 
 func TestStoreExpiration(t *testing.T) {
-	s := newStore()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
 	expiration := time.Now().Add(time.Second)
-	i := Item{
+	i := &Item[int]{
 		Key:        key,
 		Conflict:   conflict,
 		Value:      1,
 		Expiration: expiration,
 	}
-	s.Set(&i)
+	s.Set(i)
 	val, ok := s.Get(key, conflict)
 	require.True(t, ok)
-	require.Equal(t, 1, val.(int))
+	require.Equal(t, 1, val)
 
 	ttl := s.Expiration(key)
 	require.Equal(t, expiration, ttl)
@@ -184,51 +185,58 @@ func TestStoreExpiration(t *testing.T) {
 }
 
 func BenchmarkStoreGet(b *testing.B) {
-	s := newStore()
+	b.ReportAllocs()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
-	i := Item{
+	i := &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    1,
 	}
-	s.Set(&i)
+	s.Set(i)
 	b.SetBytes(1)
+	var total uint64
 	b.RunParallel(func(pb *testing.PB) {
+		var c int
 		for pb.Next() {
-			s.Get(key, conflict)
+			v, ok := s.Get(key, conflict)
+			if ok {
+				c += v
+			}
 		}
+		atomic.AddUint64(&total, uint64(c))
 	})
 }
 
 func BenchmarkStoreSet(b *testing.B) {
-	s := newStore()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
 	b.SetBytes(1)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			i := Item{
+			i := &Item[int]{
 				Key:      key,
 				Conflict: conflict,
 				Value:    1,
 			}
-			s.Set(&i)
+			s.Set(i)
 		}
 	})
 }
 
 func BenchmarkStoreUpdate(b *testing.B) {
-	s := newStore()
+	s := newStore[int]()
 	key, conflict := z.KeyToHash(1)
-	i := Item{
+	i := &Item[int]{
 		Key:      key,
 		Conflict: conflict,
 		Value:    1,
 	}
-	s.Set(&i)
+	s.Set(i)
 	b.SetBytes(1)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			s.Update(&Item{
+			s.Update(&Item[int]{
 				Key:      key,
 				Conflict: conflict,
 				Value:    2,
