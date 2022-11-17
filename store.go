@@ -23,7 +23,6 @@ import (
 
 // TODO: Do we need this to be a separate struct from Item?
 type storeItem[V any] struct {
-	key        uint64
 	conflict   uint64
 	value      V
 	expiration time.Time
@@ -170,7 +169,6 @@ func (m *lockedMap[V]) Set(i Item[V]) {
 	}
 
 	m.data[i.Key] = storeItem[V]{
-		key:        i.Key,
 		conflict:   i.Conflict,
 		value:      i.Value,
 		expiration: i.Expiration,
@@ -216,7 +214,6 @@ func (m *lockedMap[V]) Update(newItem Item[V]) (V, bool) {
 
 	m.em.update(newItem.Key, newItem.Conflict, item.expiration, newItem.Expiration)
 	m.data[newItem.Key] = storeItem[V]{
-		key:        newItem.Key,
 		conflict:   newItem.Conflict,
 		value:      newItem.Value,
 		expiration: newItem.Expiration,
@@ -229,9 +226,9 @@ func (m *lockedMap[V]) Update(newItem Item[V]) (V, bool) {
 func (m *lockedMap[V]) Clear(onEvict itemCallback[V]) {
 	m.Lock()
 	if onEvict != nil {
-		for _, si := range m.data {
+		for key, si := range m.data {
 			onEvict(Item[V]{
-				Key:      si.key,
+				Key:      key,
 				Conflict: si.conflict,
 				Value:    si.value,
 			})

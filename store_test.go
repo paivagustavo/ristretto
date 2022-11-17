@@ -123,7 +123,6 @@ func TestStoreCollision(t *testing.T) {
 	s := newShardedMap[int]()
 	s.shards[1].Lock()
 	s.shards[1].data[1] = storeItem[int]{
-		key:      1,
 		conflict: 0,
 		value:    1,
 	}
