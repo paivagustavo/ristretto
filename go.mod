@@ -1,4 +1,4 @@
-module github.com/dgraph-io/ristretto
+module github.com/paivagustavo/ristretto
 
 go 1.18
 

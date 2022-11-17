@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/ristretto/z/simd"
 	"github.com/dustin/go-humanize"
+	"github.com/paivagustavo/ristretto/z/simd"
 	"github.com/stretchr/testify/require"
 )
 
